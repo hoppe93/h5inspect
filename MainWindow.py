@@ -7,6 +7,7 @@ import scipy.io
 import h5py
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
+import pathlib
 from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWidgets import QMessageBox
 
@@ -22,6 +23,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.treeViewModel = QtGui.QStandardItemModel()
         self.ui.treeView.setModel(self.treeViewModel)
+
+        self.attributeIcon = QtGui.QIcon("{}/icons/attribute.png".format(pathlib.Path(__file__).parent.absolute()))
+        self.dataIcon      = QtGui.QIcon("{}/icons/data.png".format(pathlib.Path(__file__).parent.absolute()))
+        self.groupIcon     = QtGui.QIcon("{}/icons/group.png".format(pathlib.Path(__file__).parent.absolute()))
 
         # Bind to events
         self.bindEvents()
@@ -47,6 +52,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.treeView.setEnabled(enable)
         self.ui.gbInfo.setEnabled(enable)
         self.ui.gbData.setEnabled(enable)
+        self.ui.tbPath.setEnabled(enable)
 
 
     def enable(self): self.disable(True)
@@ -98,16 +104,42 @@ class MainWindow(QtWidgets.QMainWindow):
             else: p += key
             
             if type(self.h5file[p]) == h5py.Group:
+                itm.setIcon(self.groupIcon)
                 self._populateTree(p, itm)
+            else:
+                itm.setIcon(self.dataIcon)
+
+            for a in self.h5file[p].attrs:
+                itma = QtGui.QStandardItem(a)
+                itma.setIcon(self.attributeIcon)
+                itma.setData('attribute')
+                itm.appendRow(itma)
 
 
-    def loadItemData(self, path):
+    def getData(self, dset):
+        """
+        Get data from dataset.
+        """
+        if dset.dtype == 'S1' or str(dset.dtype).startswith('|S'):
+            return dset[:].tostring().decode('utf-8')
+        elif dset.dtype == 'object':
+            return dset[:][0].decode()
+        else:
+            return str(dset[:])
+
+
+    def loadItemData(self, path, attribute=None):
         """
         Load data for the given dataset.
         """
-        dset = self.h5file[path]
+        dset = None
+        if attribute is None:
+            dset = self.h5file[path]
+            self.ui.lblName.setText(path)
+        else:
+            dset = self.h5file[path].attrs[attribute]
+            self.ui.lblName.setText(path + '/attribute')
 
-        self.ui.lblName.setText(path)
         self.ui.lblType.setText(str(dset.dtype))
         self.ui.lblShape.setText(str(dset.shape))
 
@@ -125,7 +157,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Only show data that is in the < 1 MiB
         if sizeidx <= 1:
-            self.ui.txtData.setPlainText(str(dset[:]))
+            self.ui.txtData.setPlainText(self.getData(dset[:]))
         else:
             self.ui.txtData.setPlainText('[DATA > 1 MiB]')
 
@@ -145,9 +177,18 @@ class MainWindow(QtWidgets.QMainWindow):
         Emitted when an item is selected in the TreeView.
         """
         item = self.treeViewModel.itemFromIndex(newIndex.indexes()[0])
-        path = self.getItemPath(item)
 
-        if type(self.h5file[path]) == h5py.Dataset:
-            self.loadItemData(path)
+        if item.data() == 'attribute':
+            path = self.getItemPath(item.parent())
+            self.loadItemData(path, item.text())
+
+            self.ui.tbPath.setText(path + '/' + item.text())
+        else:
+            path = self.getItemPath(item)
+
+            if type(self.h5file[path]) == h5py.Dataset:
+                self.loadItemData(path)
+
+            self.ui.tbPath.setText(path)
 
 
