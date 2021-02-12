@@ -120,12 +120,18 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         Get data from dataset.
         """
-        if dset.dtype == 'S1' or str(dset.dtype).startswith('|S'):
-            return dset[:].tostring().decode('utf-8')
-        elif dset.dtype == 'object':
-            return dset[:][0].decode()
+        if type(dset) == h5py.Dataset:
+            if dset.dtype == 'S1' or str(dset.dtype).startswith('|S'):
+                return dset[:].tostring().decode('utf-8')
+            elif dset.dtype == 'object':
+                return dset[:][0].decode()
+            else:
+                return str(dset[:])
         else:
-            return str(dset[:])
+            if type(dset) == np.bytes_ or type(dset) == bytes:
+                return dset.decode('utf-8')
+            else:
+                return str(dset)
 
 
     def loadItemData(self, path, attribute=None):
