@@ -10,9 +10,12 @@ import matplotlib.pyplot as plt
 import pathlib
 from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWidgets import QMessageBox
+from PlotWindow import PlotWindow
 
 
 class MainWindow(QtWidgets.QMainWindow):
+
+
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = main_design.Ui_MainWindow()
@@ -20,6 +23,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.filename = ""
         self.h5file = None
+
+        self.itemToPlot = None
+        self.plotWindows = []
 
         self.treeViewModel = QtGui.QStandardItemModel()
         self.ui.treeView.setModel(self.treeViewModel)
@@ -42,6 +48,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.actionExit.triggered.connect(self.exit)
         self.ui.actionOpen.triggered.connect(self.openFile)
         self.ui.treeView.selectionModel().selectionChanged.connect(self.itemSelected)
+        self.ui.treeView.customContextMenuRequested.connect(self.tvContextMenu)
 
 
     def disable(self, enable=False):
@@ -134,6 +141,21 @@ class MainWindow(QtWidgets.QMainWindow):
                 return str(dset)
 
 
+    def getDataFromItem(self, item):
+        """
+        Given a TreeView item, returns the raw data corresponding to
+        that item.
+        """
+        if type(item) == str:
+            path = item
+        else:
+            path = self.getItemPath(item)
+
+        dset = self.h5file[path]
+
+        return dset[:]
+
+
     def loadItemData(self, path, attribute=None):
         """
         Load data for the given dataset.
@@ -178,6 +200,13 @@ class MainWindow(QtWidgets.QMainWindow):
             return self.getItemPath(item.parent()) + '/' + item.text()
 
 
+    def getSelectedItem(self):
+        """
+        Returns the currently selected treeview item.
+        """
+        return self.treeViewModel.itemFromIndex(self.ui.treeView.selectionModel().selectedIndexes()[0])
+
+
     def itemSelected(self, newIndex, oldIndex=None):
         """
         Emitted when an item is selected in the TreeView.
@@ -196,5 +225,70 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.loadItemData(path)
 
             self.ui.tbPath.setText(path)
+
+
+    def plot(self, x=None, y=None, xname=None, yname=None):
+        """
+        Plot the given data.
+        """
+        pw = PlotWindow()
+        self.plotWindows.append(pw)
+
+        #print(f'x = {x}')
+        #print(f'y = {y}')
+        if x is None:
+            print(type(y))
+            pw.plot(y)
+        else:
+            pw.plot(x, y)
+
+        if xname:
+            pw.set_xlabel(xname)
+        if yname:
+            pw.set_ylabel(yname)
+
+        pw.show()
+
+
+    def tvContextMenu(self, position):
+        """
+        Triggered when a context menu is requested for a TreeView item.
+        """
+        item = self.getSelectedItem()
+
+        # Only show context menu for datasets (i.e. not groups)
+        if item.hasChildren():
+            return
+
+        menu = QtWidgets.QMenu()
+
+        if self.itemToPlot is None:
+            # Plot this
+            actionPlot = menu.addAction("Plot")
+            # Plot against other dataset
+            actionPlotAgainst = menu.addAction("Plot against...")
+
+            action = menu.exec_(self.ui.treeView.viewport().mapToGlobal(position))
+
+            if action == actionPlot:
+                y = self.getDataFromItem(item)
+                self.plot(y=y, yname=item.text())
+            elif action == actionPlotAgainst:
+                self.itemToPlot = self.getItemPath(item)
+        else:
+            actionPlot = menu.addAction(f"Plot against '{self.itemToPlot.split('/')[-1]}'")
+            actionReset = menu.addAction("Reset plotting")
+
+            action = menu.exec_(self.ui.treeView.viewport().mapToGlobal(position))
+
+            if action == actionPlot:
+                # TODO
+                x = self.getDataFromItem(item)
+                y = self.getDataFromItem(self.itemToPlot)
+                self.plot(x=x, y=y, xname=item.text(), yname=self.itemToPlot.split('/')[-1])
+
+                self.itemToPlot = None
+            elif action == actionReset:
+                self.itemToPlot = None
 
 
