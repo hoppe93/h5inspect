@@ -72,6 +72,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def exit(self):
         if self.h5file is not None:
             self.h5file.close()
+
+        for pw in self.plotWindows:
+            pw.close()
+
         self.close()
 
     
