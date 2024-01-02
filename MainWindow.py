@@ -12,6 +12,12 @@ from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWidgets import QMessageBox
 from PlotWindow import PlotWindow
 
+try:
+    import convertMat2H5
+    CONVERT_AVAILABLE = True
+except ModuleNotFoundError:
+    CONVERT_AVAILABLE = False
+
 
 class MainWindow(QtWidgets.QMainWindow):
 
@@ -37,6 +43,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # Bind to events
         self.bindEvents()
 
+        if not CONVERT_AVAILABLE:
+            self.ui.actionImportMAT.setEnabled(False)
+
         # Disable controls
         self.disable()
 
@@ -47,6 +56,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def bindEvents(self):
         self.ui.actionExit.triggered.connect(self.exit)
         self.ui.actionOpen.triggered.connect(self.openFile)
+        self.ui.actionImportMAT.triggered.connect(self.importMAT)
         self.ui.treeView.selectionModel().selectionChanged.connect(self.itemSelected)
         self.ui.treeView.customContextMenuRequested.connect(self.tvContextMenu)
 
@@ -84,6 +94,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if filename:
             self.loadFile(filename)
+
+
+    def importMAT(self):
+        filename, _ = QFileDialog.getOpenFileName(parent=self, caption="Open Matlab MAT file (old version)", filter="MAT file (*.mat);;All files (*.*)")
+        savename, _ = QFileDialog.getSaveFileName(parent=self, caption="Name of HDF5 file to save to", filter="HDF5 file (*.h5);;All files (*.*)")
+
+        try:
+            convertMat2H5.convert(filename, savename)
+        except Exception as ex:
+            QMessageBox.critical(self, "MAT import failed", f"Failed to import Matlab MAT file. Warnings may appear in the terminal.\n\n{ex}")
+            return
+
+        self.loadFile(savename)
 
 
     def loadFile(self, filename):
