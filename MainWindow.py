@@ -294,7 +294,8 @@ class MainWindow(QtWidgets.QMainWindow):
         item = self.getSelectedItem()
 
         # Only show context menu for datasets (i.e. not groups)
-        if item.hasChildren():
+        path = self.getItemPath(item)
+        if type(self.h5file[path]) != h5py.Dataset:
             return
 
         menu = QtWidgets.QMenu()
