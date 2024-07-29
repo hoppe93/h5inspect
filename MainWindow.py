@@ -195,10 +195,17 @@ class MainWindow(QtWidgets.QMainWindow):
             dset = self.h5file[path].attrs[attribute]
             self.ui.lblName.setText(path + '/attribute')
 
-        self.ui.lblType.setText(str(dset.dtype))
-        self.ui.lblShape.setText(str(dset.shape))
+        if type(dset) == h5py.Dataset:
+            isData = True
+            self.ui.lblType.setText(str(dset.dtype))
+            self.ui.lblShape.setText(str(dset.shape))
+            size = dset.size
+        else:
+            isData = False
+            self.ui.lblType.setText(str(type(dset)))
+            self.ui.lblShape.setText(f'({len(dset)}, )')
+            size = len(dset)
 
-        size = dset.size
         sizeidx = 0
         units = ['bytes', 'kiB', 'MiB', 'GiB', 'TiB', 'PiB']
         while size > 1024:
@@ -212,7 +219,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Only show data that is in the < 1 MiB
         if sizeidx <= 1:
-            self.ui.txtData.setPlainText(self.getData(dset[:]))
+            if isData and dset.shape == ():
+                self.ui.txtData.setPlainText(self.getData(dset[()]))
+            else:
+                self.ui.txtData.setPlainText(self.getData(dset[:]))
         else:
             self.ui.txtData.setPlainText('[DATA > 1 MiB]')
 
